@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESNILOMA - Pedidos Online</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        /* DISEÑO PROFESIONAL ESNILOMA */
+        :root { --primary: #2ecc71; --dark: #1e293b; --bg: #f8fafc; }
+        body { font-family: 'Outfit', sans-serif; background: var(--bg); margin: 0; color: var(--dark); padding-bottom: 90px; }
+        
+        .header { background: var(--primary); color: white; padding: 30px 20px; text-align: center; border-radius: 0 0 30px 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .logo { font-size: 2.2em; font-weight: 800; letter-spacing: -1px; margin: 0; }
+        .slogan { opacity: 0.9; font-size: 0.9em; margin-top: 5px; }
+
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 15px; padding: 20px; }
+        .card { background: white; border-radius: 20px; padding: 15px; text-align: center; box-shadow: 0 8px 20px rgba(0,0,0,0.04); transition: 0.3s; border: 1px solid #edf2f7; }
+        .card img { width: 100px; height: 100px; object-fit: cover; border-radius: 50%; background: #f1f5f9; margin-bottom: 10px; }
+        .card h4 { margin: 10px 0 5px; font-size: 1.1em; color: var(--dark); }
+        .card .price { color: var(--primary); font-weight: 800; font-size: 1.2em; margin-bottom: 12px; }
+        
+        .btn-add { background: var(--primary); color: white; border: none; padding: 10px; border-radius: 12px; width: 100%; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        .btn-add:active { transform: scale(0.95); }
+
+        /* CARRITO FLOTANTE */
+        .float-cart { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--dark); color: white; border: none; padding: 15px 35px; border-radius: 50px; font-size: 1.1em; font-weight: 700; box-shadow: 0 10px 25px rgba(0,0,0,0.3); z-index: 999; cursor: pointer; display: flex; align-items: center; gap: 10px; }
+        .badge { background: var(--primary); padding: 2px 8px; border-radius: 10px; font-size: 0.8em; }
+
+        /* MODAL */
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 1000; padding: 20px; align-items: center; justify-content: center; }
+        .modal-content { background: white; border-radius: 25px; padding: 25px; width: 100%; max-width: 400px; max-height: 90vh; overflow-y: auto; }
+        .input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #e2e8f0; border-radius: 12px; font-family: inherit; font-size: 16px; box-sizing: border-box; }
+        
+        .item-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
+        .total-box { font-size: 1.6em; font-weight: 800; text-align: center; margin: 20px 0; color: var(--dark); }
+        
+        .btn-confirm { background: var(--primary); color: white; border: none; padding: 16px; border-radius: 15px; width: 100%; font-size: 1.1em; font-weight: 700; cursor: pointer; margin-top: 10px; }
+        .btn-close { background: #f1f5f9; color: #64748b; border: none; padding: 10px; border-radius: 12px; width: 100%; margin-top: 10px; cursor: pointer; }
+        
+        #cambio-info { text-align: center; font-weight: 600; margin-bottom: 10px; min-height: 20px; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1 class="logo">ESNILOMA</h1>
+    <p class="slogan">Calidad y frescura a tu puerta 🏪</p>
+</div>
+
+<div id="grid" class="grid"></div>
+
+<button class="float-cart" onclick="abrirCarrito()">
+    🛒 Ver Carrito <span class="badge" id="count">0</span>
+</button>
+
+<div id="modal-carrito" class="modal">
+    <div class="modal-content">
+        <h3 style="margin-top:0">Tu Pedido</h3>
+        <div id="lista-carrito"></div>
+        <div class="total-box" id="total-txt">RD$0</div>
+        <input type="text" id="nombre-cliente" class="input" placeholder="¿Cuál es tu nombre?">
+        <input type="text" id="direccion-cliente" class="input" placeholder="Dirección de entrega">
+        <select id="metodo-pago" class="input" onchange="toggleEfectivo()">
+            <option value="Efectivo">Pago en Efectivo</option>
+            <option value="Transferencia">Transferencia Bancaria</option>
+        </select>
+        <input type="number" id="paga-con" class="input" placeholder="¿Con cuánto pagas?" oninput="calcularVuelto()">
+        <div id="cambio-info"></div>
+        <button class="btn-confirm" onclick="finalizarPedido()">Confirmar por WhatsApp</button>
+        <button class="btn-close" onclick="cerrarCarrito()">Seguir comprando</button>
+    </div>
+</div>
+
+<script>
+    // --- CONFIGURACIÓN ACTUALIZADA ---
+    const URL_SCRIPT = "https://script.google.com/macros/s/AKfycbwHsq1GhK5PpkkBQx4ddvb2oHKpwTXRIaTRBGGjAplEsMkQRYHmFIonX02_1kGa64Vz/exec";
+    const WHATSAPP_NUM = "18097600364";
+
+    let productos = [];
+    let carrito = [];
+
+    async function cargarMenu() {
+        const grid = document.getElementById('grid');
+        grid.innerHTML = "<p>Actualizando menú...</p>";
+        try {
+            const res = await fetch(URL_SCRIPT);
+            productos = await res.json();
+            renderizar();
+        } catch (e) {
+            grid.innerHTML = "<p>Error al conectar. Verifica tu Google Sheets.</p>";
+        }
+    }
+
+    function renderizar() {
+        const grid = document.getElementById('grid');
+        grid.innerHTML = productos.map(p => `
+            <div class="card">
+                <img src="${p.img}" onerror="this.src='https://via.placeholder.com/150?text=ESNILOMA'">
+                <h4>${p.nombre}</h4>
+                <div class="price">RD$${p.precio}</div>
+                <button class="btn-add" onclick="agregarAlCarrito('${p.nombre}', ${p.precio})">Agregar</button>
+            </div>
+        `).join('');
+    }
+
+    function agregarAlCarrito(nombre, precio) {
+        const existente = carrito.find(item => item.nombre === nombre);
+        if(existente) {
+            existente.cant++;
+        } else {
+            carrito.push({ nombre, precio, cant: 1 });
+        }
+        actualizarContador();
+    }
+
+    function actualizarContador() {
+        const totalItems = carrito.reduce((acc, item) => acc + item.cant, 0);
+        document.getElementById('count').innerText = totalItems;
+    }
+
+    function abrirCarrito() {
+        if(carrito.length === 0) return alert("Tu carrito está vacío.");
+        const modal = document.getElementById('modal-carrito');
+        const lista = document.getElementById('lista-carrito');
+        let suma = 0;
+
+        lista.innerHTML = carrito.map(item => {
+            suma += (item.precio * item.cant);
+            return `<div class="item-row">
+                        <span>${item.cant}x ${item.nombre}</span>
+                        <span>RD$${item.precio * item.cant}</span>
+                    </div>`;
+        }).join('');
+
+        document.getElementById('total-txt').innerText = "RD$" + suma;
+        modal.style.display = 'flex';
+        calcularVuelto();
+    }
+
+    function cerrarCarrito() { document.getElementById('modal-carrito').style.display = 'none'; }
+
+    function toggleEfectivo() {
+        const metodo = document.getElementById('metodo-pago').value;
+        document.getElementById('paga-con').style.display = (metodo === "Efectivo") ? "block" : "none";
+        if(metodo !== "Efectivo") document.getElementById('cambio-info').innerText = "";
+    }
+
+    function calcularVuelto() {
+        const total = parseInt(document.getElementById('total-txt').innerText.replace("RD$", ""));
+        const paga = parseInt(document.getElementById('paga-con').value) || 0;
+        const info = document.getElementById('cambio-info');
+        
+        if(paga > total) {
+            info.innerText = "Tu cambio: RD$" + (paga - total);
+            info.style.color = "#2ecc71";
+        } else if (paga > 0 && paga < total) {
+            info.innerText = "Faltan: RD$" + (total - paga);
+            info.style.color = "#e74c3c";
+        } else {
+            info.innerText = "";
+        }
+    }
+
+    async function finalizarPedido() {
+        const nombre = document.getElementById('nombre-cliente').value;
+        const direccion = document.getElementById('direccion-cliente').value;
+        const metodo = document.getElementById('metodo-pago').value;
+        const total = document.getElementById('total-txt').innerText;
+        const pagaCon = document.getElementById('paga-con').value || "0";
+        const itemsMsg = carrito.map(i => `${i.cant}x ${i.nombre}`).join(", ");
+
+        if(!nombre || !direccion) return alert("Por favor, ingresa tu nombre y dirección.");
+
+        const datosExcel = {
+            nombre: nombre,
+            items: itemsMsg,
+            total: total,
+            metodo: metodo,
+            direccion: direccion
+        };
+
+        // Guardar en Google Sheets
+        fetch(URL_SCRIPT, {
+            method: 'POST',
+            mode: 'no-cors',
+            body: JSON.stringify(datosExcel)
+        });
+
+        // Abrir WhatsApp
+        const textoWA = `*NUEVO PEDIDO - ESNILOMA*\n` +
+                        `--------------------------\n` +
+                        `*Cliente:* ${nombre}\n` +
+                        `*Dirección:* ${direccion}\n` +
+                        `--------------------------\n` +
+                        `*Pedido:* ${itemsMsg}\n` +
+                        `*Total:* ${total}\n` +
+                        `*Pago:* ${metodo}\n` +
+                        (metodo === "Efectivo" ? `*Paga con:* RD$${pagaCon}` : "");
+
+        window.open(`https://wa.me/${WHATSAPP_NUM}?text=${encodeURIComponent(textoWA)}`, '_blank');
+        
+        carrito = [];
+        actualizarContador();
+        cerrarCarrito();
+    }
+
+    cargarMenu();
+</script>
+
+</body>
+</html>
